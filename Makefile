@@ -15,7 +15,7 @@ install:
 	install -D -m0644 src/minecraftd-save@.timer \
 		$(PREFIX)/usr/lib/systemd/system/minecraftd-save@.timer
 	install -D -m0644 src/minecraftctl.sh  $(PREFIX)/usr/bin/minecraftctl
-	mkdir -p /etc/minecraft
+	mkdir -p ${PREFIX}/etc/minecraft
 	cp src/template-vars $(PREFIX)/etc/minecraft/default
 
 .PHONY: uninstall
