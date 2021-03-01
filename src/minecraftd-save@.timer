@@ -1,11 +1,9 @@
 [Unit]
-Description=Daily save of Minecraft server %i
+Description=Daily save on Minecraft server %I
 
 [Timer]
 OnCalendar=daily
 Persistent=true
 
-
 [Install]
 WantedBy=multi-user.target
-

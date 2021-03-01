@@ -1,0 +1,111 @@
+# Server listen port
+#PORT="25565"
+
+# RCON listen port
+#RCON_PORT="25575"
+
+# RCON password
+#RCON_PASSWORD="minecraft"
+
+# Max java heap size in MB
+#MAXHEAP="2048"
+
+# Min java heap size in MB
+#MINHEAP="512"
+
+# Wether to mount a persistent volume for the server
+# If true a volume will not be mounted and a restart will lose all world data
+#EPHEMERAL=false
+
+# Directory for persisting minecraft data
+#DATA_DIR="/srv/minecraft"
+
+# Relative directory to $DATA_DIR for saving minecraft backups
+#BACKUP_DIR="./backups"
+
+# Name of world dir
+#LEVEL="world"
+
+# Game command timeout
+#TIMEOUT="0"
+
+# Need to accept the EULA to start the server
+#EULA=false
+
+# Extra JVM options
+#EXTRA_JVM_OPTS=""
+
+# Game version
+#VERSION="LATEST"
+
+# Game difficulty
+#DIFFICULTY="normal"
+
+# Whitelist - list of whitelisted players (maybe only one, idk)
+#WHITELIST=""
+
+# Ops
+#OPS=""
+
+# Server icon
+#ICON="/path/to/server-icon.png"
+
+# Max players
+#MAX_PLAYERS="10"
+
+# Max world size
+#MAX_WORLD_SIZE="29999984"
+
+# Allow nether
+#ALLOW_NETHER=true
+
+# Announce player achievements
+#ANNOUNCE_PLAYER_ACHIEVEMENTS=true
+
+# Enable command blocks
+#ENABLE_COMMAND_BLOCK=false
+
+# Force gamemode
+#FORCE_GAMEMODE=false
+
+# Generate structures
+#GENERATE_STRUCTURES=true
+
+# Hardcore
+#HARDCORE=false
+
+# Max build height
+#MAX_BUILD_HEIGHT=256
+
+# Max tick time (time one tick can take before being considered a crash (option added in 14w32a))
+#MAX_TICK_TIME=60000
+
+# Spawn monsters
+#SPAWN_MONSTERS=true
+
+# Spawn NPCs
+#SPAWN_NPCS=true
+
+# View distance
+#VIEW_DISTANCE=10
+
+# World seed
+#SEED=""
+
+# Gamemode - survival, creative, adventure, or spectator
+#MODE=
+
+# Message of the day
+#MOTD="A Minecraft server"
+
+# PVP
+#PVP=true
+
+# Level type - Can be default, flat (can be modified with 'generator-settings'), largeBiomes, amplified, or buffet (only on 1.15 or below, same as default unless 'generator-settings' is set)
+#LEVEL_TYPE="default"
+
+# Docker autopause -- if server forcibly shuts down/crashes when a client connects after an extended period of no client connections, disable this
+#AUTOPAUSE=true
+
+# Server type - can be vanilla, forge, bukkit, spigot, or paper
+#TYPE="vanilla"
