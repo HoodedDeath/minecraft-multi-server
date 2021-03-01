@@ -15,9 +15,11 @@ The minecraft user and group should be a system user/group
 
 You should also create `/srv/minecraft` directory and change ownership to the minecraft user and group
 
-NOTE: The script pulls a default server icon from `/srv/minecraft/default/server-icon.png`. A default icon is not supplied and will be ignored if it doesn't exist
+NOTE: The script pulls a default server icon from `/srv/minecraft/default/server-icon.png`. A default icon is not supplied and will be ignored if it doesn't exist.
 
 NOTE: `grep` and `sed` are also required in order to watch the minecraft logs for various events.
+
+NOTE: You may need to add your user to the minecraft group to modify files within `/srv/minecraft/` without the need to use super user.
 
 # AUR Package
 
