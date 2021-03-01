@@ -23,7 +23,7 @@ NOTE: You may need to add your user to the minecraft group to modify files withi
 
 # AUR Package
 
-AUR package potentially soon to come
+AUR package available [here](https://aur.archlinux.org/packages/minecraft-server-manager/)
 
 # Usage
 
