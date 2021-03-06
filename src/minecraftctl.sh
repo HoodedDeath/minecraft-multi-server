@@ -61,7 +61,7 @@ function start {
         cp "${ICON}" "${DATA_DIR}/${name}/server-icon.png"
     fi
 
-    vol_mount="--volume=$DATA_DIR/${name}/data"
+    vol_mount="--volume=$DATA_DIR/${name}:/data"
     if $EPHEMERAL; then
         vol_mount=""
         echo "Ephemeral server, a restart will lose all world data"
