@@ -56,7 +56,7 @@ function start {
     stop_container
 
     # Copy requested server icon if it exists
-    if [[ -f "${ICON}" ]]; then
+    if [[ -f "${ICON}" ]] && [[ ! -f "${DATA_DIR}/${name}/server-icon.png" ]]; then
         mkdir "${DATA_DIR}/${name}"
         cp "${ICON}" "${DATA_DIR}/${name}/server-icon.png"
     fi
@@ -66,7 +66,7 @@ function start {
         vol_mount=""
         echo "Ephemeral server, a restart will lose all world data"
     fi
-#        -e "JVM_OPTS=-Xmx${MAXHEAP}M -Xms${MINHEAP}M -D${name}" \
+
     $DOCKER run -d -i \
         --name "$name" \
         $vol_mount \
@@ -109,6 +109,7 @@ function start {
         -e "GID=$MINECRAFT_GID" \
         -e "ENABLE_AUTOPAUSE=$AUTOPAUSE" \
         -e "TIMEOUT=$TIMEOUT" \
+        -e "SPAWN_PROTECTION=$SPAWN_PROTECTION" \
         itzg/minecraft-server
 
     echo "Started minecraft container $name"
@@ -196,120 +197,151 @@ if [[ -z "$name" ]]; then
 elif [[ "x$name" == "xdefault" ]]; then
     unuseable_name
 fi
+
 # Attempt to source the related configuration file
 if [[ -f "/etc/minecraft/$name" ]]; then
     source "/etc/minecraft/$name"
+fi
+
+# Check Environment variables
+
+# Get system default docker path if none is provided in configuration file
+if [[ -z $DOCKER ]]; then
+    DOCKER=$(which docker)
+fi
+# Default listen port
+# This is the published host port,
+# internally, the container always listens on 25565
+if [[ -z $PORT ]]; then
+    PORT="25565"
+fi
+# Default listen port for Rcon
+# This is the published host port,
+# internally, the container always listens on 25575
+if [[ -z $RCON_PORT ]]; then
+    RCON_PORT="25575"
+fi
+# Default Rcon password
+if [[ -z $RCON_PASSWORD ]]; then
+    RCON_PASSWORD="minecraft"
+fi
+# Set Rcon command template
+RCON_CMD="mcrcon -P ${RCON_PORT} -p ${RCON_PASSWORD}"
+# Default min java heap size in MB
+if [[ -z $MINHEAP ]]; then
+    MINHEAP="512"
+fi
+# Default max java heap size in MB
+if [[ -z $MAXHEAP ]]; then
+    MAXHEAP="2048"
+fi
+# EULA - Defaults to false, must be set to true to start server
+if [[ -z $EULA ]]; then
+    EULA=false
 fi
 # Server type
 if [[ -z $TYPE ]]; then
     TYPE="vanilla"
 fi
-# Docker autopause
-if [[ -z $AUTOPAUSE ]]; then
-    AUTOPAUSE=true
-fi
-# Level type
-if [[ -z $LEVEL_TYPE ]]; then
-    LEVEL_TYPE="default"
-fi
-# PVP
-if [[ -z $PVP ]]; then
-    PVP=true
-fi
-# Message of the day
-if [[ -z $MOTD ]]; then
-    MOTD="A Minecraft server"
-fi
-# View distance
-if [[ -z $VIEW_DISTANCE ]]; then
-    VIEW_DISTANCE=10
-fi
-# Spawn NPCs
-if [[ -z $SPAWN_NPCS ]]; then
-    SPAWN_NPCS=true
-fi
-# Spawn monsters
-if [[ -z $SPAWN_MONSTERS ]]; then
-    SPAWN_MONSTERS=true
-fi
-# Max tick time
-if [[ -z $MAX_TICK_TIME ]]; then
-    MAX_TICK_TIME=60000
-fi
-# Max build height
-if [[ -z $MAX_BUILD_HEIGHT ]]; then
-    MAX_BUILD_HEIGHT=256
-fi
-# Hardcore
-if [[ -z $HARDCORE ]]; then
-    HARDCORE=false
-fi
-# Generate structures
-if [[ -z $GENERATE_STRUCTURES ]]; then
-    GENERATE_STRUCTURES=true
-fi
-# Force gamemode
-if [[ -z $FORCE_GAMEMODE ]]; then
-    FORCE_GAMEMODE=false
-fi
-# Enable command blocks
-if [[ -z $ENABLE_COMMAND_BLOCK ]]; then
-    ENABLE_COMMAND_BLOCK=false
-fi
-# Announce player achievements
-if [[ -z $ANNOUNCE_PLAYER_ACHIEVEMENTS ]]; then
-    ANNOUNCE_PLAYER_ACHIEVEMENTS=true
-fi
-# Allow nether
-if [[ -z $ALLOW_NETHER ]]; then
-    ALLOW_NETHER=true
-fi
-# Max world size
-if [[ -z $MAX_WORLD_SIZE ]]; then
-    MAX_WORLD_SIZE="29999984"
-fi
-# Max players
-if [[ -z $MAX_PLAYERS ]]; then
-    MAX_PLAYERS="10"
-fi
-# Server icon
-if [[ -z $ICON ]]; then
-    ICON="/srv/minecraft/default/server-icon.png"
+# Game version
+if [[ -z $VERSION ]]; then
+    VERSION="LATEST"
 fi
 # Game difficulty
 if [[ -z $DIFFICULTY ]]; then
     DIFFICULTY="normal"
 fi
-# Game version
-if [[ -z $VERSION ]]; then
-    VERSION="LATEST"
+# Server icon
+if [[ -z $ICON ]]; then
+    ICON="/srv/minecraft/default/server-icon.png"
 fi
-# Default listen port
-# This is the published host port,
-# internally the container always listens on 25565
-if [[ -z $PORT ]]; then
-    PORT="25565"
+# Max players
+if [[ -z $MAX_PLAYERS ]]; then
+    MAX_PLAYERS="10"
 fi
-# Default listen port for rcon
-# This is the published host port,
-# internally the container always listens on 25575
-if [[ -z $RCON_PORT ]]; then
-    RCON_PORT="25575"
+# Max world size
+if [[ -z $MAX_WORLD_SIZE ]]; then
+    MAX_WORLD_SIZE="29999984"
 fi
-if [[ -z $RCON_PASSWORD ]]; then
-    RCON_PASSWORD="minecraft"
+# Allow nether
+if [[ -z $ALLOW_NETHER ]]; then
+    ALLOW_NETHER=true
 fi
-RCON_CMD="mcrcon -P ${RCON_PORT} -p ${RCON_PASSWORD}"
-# Default max java heap size in MB
-if [[ -z $MAXHEAP ]]; then
-    MAXHEAP="2048"
+# Announce player achievements
+if [[ -z $ANNOUNCE_PLAYER_ACHIEVEMENTS ]]; then
+    ANNOUNCE_PLAYER_ACHIEVEMENTS=true
 fi
-# Default min java heap size in MB
-if [[ -z $MINHEAP ]]; then
-    MINHEAP="512"
+# Enable command blocks
+if [[ -z $ENABLE_COMMAND_BLOCK ]]; then
+    ENABLE_COMMAND_BLOCK=false
 fi
-# Path to docker executable
-DOCKER=$(which docker)
+# Force gamemode
+if [[ -z $FORCE_GAMEMODE ]]; then
+    FORCE_GAMEMODE=false
+fi
+# Generate structures
+if [[ -z $GENERATE_STRUCTURES ]]; then
+    GENERATE_STRUCTURES=true
+fi
+# Hardcore
+if [[ -z $HARDCORE ]]; then
+    HARDCORE=false
+fi
+# Max build height
+if [[ -z $MAX_BUILD_HEIGHT ]]; then
+    MAX_BUILD_HEIGHT=256
+fi
+# Max tick time
+if [[ -z $MAX_TICK_TIME ]]; then
+    MAX_TICK_TIME=60000
+fi
+# Spawn monsters
+if [[ -z $SPAWN_MONSTERS ]]; then
+    SPAWN_MONSTERS=true
+fi
+# Spawn NPCs
+if [[ -z $SPAWN_NPCS ]]; then
+    SPAWN_NPCS=true
+fi
+# View distance
+if [[ -z $VIEW_DISTANCE ]]; then
+    VIEW_DISTANCE=10
+fi
+# Gamemode ?
+if [[ -z $MODE ]]; then
+    MODE="survival"
+fi
+# Message of the day
+if [[ -z $MOTD ]]; then
+    MOTD="A Minecraft server"
+fi
+# PVP
+if [[ -z $PVP ]]; then
+    PVP=true
+fi
+# Level type
+if [[ -z $LEVEL_TYPE ]]; then
+    LEVEL_TYPE="default"
+fi
+# Name of world dir
+if [[ -z $LEVEL ]]; then
+    LEVEL="world"
+fi
+# World folder name ?
+if [[ -z $WORLD ]]; then
+    WORLD="world"
+fi
+# IDs of minecraft user and group
+MINECRAFT_UID=$(id -u minecraft)
+MINECRAFT_GID=$(id -g minecraft)
+# Docker autopause
+if [[ -z $AUTOPAUSE ]]; then
+    AUTOPAUSE=true
+fi
+# Game command timeout
+if [[ -z $TIMEOUT ]]; then
+    TIMEOUT="0"
+fi
 # Wether to mount a persistent volume for the server
 # If true a volume will not be mounted and a restart will lose all world data
 if [[ -z $EPHEMERAL ]]; then
@@ -323,26 +355,15 @@ fi
 if [[ -z $BACKUP_DIR ]]; then
     BACKUP_DIR="./backups"
 fi
-# IDs of minecraft user and group
-MINECRAFT_UID=$(id -u minecraft)
-MINECRAFT_GID=$(id -g minecraft)
-# Name of world dir
-if [[ -z $LEVEL ]]; then
-    LEVEL="world"
+# Default spawn protection region
+if [[ -z $SPAWN_PROTECTION ]]; then
+    SPAWN_PROTECTION=64
 fi
-# Game command timeout
-if [[ -z $TIMEOUT ]]; then
-    TIMEOUT="0"
-fi
-# EULA
-if [[ -z $EULA ]]; then
-    EULA=false
-fi
-
+# Set debug flag to print trace for select commands
 if [[ -n "$DEBUG" ]]; then
     set -x
 fi
-
+# Handle command issued to script
 case "$1" in
 	status)     status;;
 	start)      start;;

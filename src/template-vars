@@ -4,48 +4,37 @@
 # RCON listen port
 #RCON_PORT="25575"
 
-# RCON password
+# RCON password - You should change this to something different on any public server for security
 #RCON_PASSWORD="minecraft"
 
-# Max java heap size in MB
-#MAXHEAP="2048"
-
-# Min java heap size in MB
+# Minimum java heap size in MB
 #MINHEAP="512"
 
-# Wether to mount a persistent volume for the server
-# If true a volume will not be mounted and a restart will lose all world data
-#EPHEMERAL=false
-
-# Directory for persisting minecraft data
-#DATA_DIR="/srv/minecraft"
-
-# Relative directory to $DATA_DIR for saving minecraft backups
-#BACKUP_DIR="./backups"
-
-# Name of world dir
-#LEVEL="world"
-
-# Game command timeout
-#TIMEOUT="0"
-
-# Need to accept the EULA to start the server
-#EULA=false
+# Maximum java heap size in MB
+#MAXHEAP="2048"
 
 # Extra JVM options
 #EXTRA_JVM_OPTS=""
 
-# Game version
+# Defaults to false because setting it to true indicates acceptance of the Mojang/Microsoft EULA
+# Must be set to true for server to start
+#EULA=false
+
+# Server type - can be vanilla, forge, bukkit, spigot, or paper
+# Currently, no extra options for any non-vanilla versions are implemented
+#TYPE="vanilla"
+
+# Game version - can be set to LATEST, SNAPSHOT, or a specific version number
 #VERSION="LATEST"
 
 # Game difficulty
 #DIFFICULTY="normal"
 
-# Whitelist - list of whitelisted players (maybe only one, idk)
-#WHITELIST=""
+# Whitelisted players - WHITELIST=user1,user2 ...
+#WHITELIST=
 
-# Ops
-#OPS=""
+# Ops - OPS=user1,user2 ...
+#OPS=
 
 # Server icon
 #ICON="/path/to/server-icon.png"
@@ -59,7 +48,7 @@
 # Allow nether
 #ALLOW_NETHER=true
 
-# Announce player achievements
+# Announce player achievements to chat
 #ANNOUNCE_PLAYER_ACHIEVEMENTS=true
 
 # Enable command blocks
@@ -78,6 +67,7 @@
 #MAX_BUILD_HEIGHT=256
 
 # Max tick time (time one tick can take before being considered a crash (option added in 14w32a))
+# This option should be set to -1 if you wish to use the autopause functionality, as autopause for long periods of time will cause the server's watcher daemon to see the server as crashed
 #MAX_TICK_TIME=60000
 
 # Spawn monsters
@@ -104,8 +94,31 @@
 # Level type - Can be default, flat (can be modified with 'generator-settings'), largeBiomes, amplified, or buffet (only on 1.15 or below, same as default unless 'generator-settings' is set)
 #LEVEL_TYPE="default"
 
+# World generator settings
+# Usage on generator settings available on Gamepedia
+#GENERATOR_SETTINGS=""
+
+# Name of the world directory
+#LEVEL="world"
+
+# URL of a world to download when starting the server, best used for hosting minigames or other worlds where world data wouldn't need to be saved. Should used EPHEMERAL=true alongside this
+#WORLD=
+
+# Wether to mount a persistent volume for the server
+# If true a volume will not be mounted and a restart will lose all world data
+#EPHEMERAL=false
+
 # Docker autopause -- if server forcibly shuts down/crashes when a client connects after an extended period of no client connections, disable this
 #AUTOPAUSE=true
 
-# Server type - can be vanilla, forge, bukkit, spigot, or paper
-#TYPE="vanilla"
+# Game command timeout
+#TIMEOUT="0"
+
+# Spawn protection (Area surrounding world spawn that non-ops cannot edit) (set to 0 to disable)
+#SPAWN_PROTECTION=64
+
+# Directory for persisting minecraft data
+#DATA_DIR="/srv/minecraft"
+
+# Relative directory to $DATA_DIR for saving minecraft backups
+#BACKUP_DIR="./backups"
