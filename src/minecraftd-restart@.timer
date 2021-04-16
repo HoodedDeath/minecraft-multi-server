@@ -1,5 +1,5 @@
 [Unit]
-Description=Daily save on Minecraft server %I
+Description=Daily restart for Minecraft server %I to clear ram and help reduce lag
 After=minecraftd@%i.service
 
 [Timer]

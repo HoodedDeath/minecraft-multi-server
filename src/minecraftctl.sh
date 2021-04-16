@@ -1,10 +1,26 @@
 #!/bin/bash
+# Names of variables that should have a non-null default value
+name_arr=("DOCKER" "PORT" "RCON_PORT" "RCON_PASSWORD" "MINHEAP" "MAXHEAP" "EULA" "TYPE" "VERSION" "DIFFICULTY" "MAX_PLAYERS" "MAX_WORLD_SIZE" "ALLOW_NETHER" "ANNOUNCE_PLAYER_ACHIEVEMENTS" "ENABLE_COMMAND_BLOCK" "FORCE_GAMEMODE" "GENERATE_STRUCTURES" "HARDCORE" "MAX_BUILD_HEIGHT" "MAX_TICK_TIME" "SPAWN_MONSTERS" "SPAWN_NPCS" "VIEW_DISTANCE" "MODE" "MOTD" "PVP" "LEVEL_TYPE" "LEVEL" "AUTOPAUSE" "TIMEOUT" "EPHEMERAL" "DATA_DIR" "BACKUP_DIR" "SPAWN_PROTECTION" "MINECRAFT_UID" "MINECRAFT_GID")
+# Default values for variables in above array
+vals_arr=("$(which docker)" "25565" "25575" "minecraft" "512" "2048" "false" "vanilla" "LATEST" "normal" "10" "29999984" "true" "true" "false" "false" "true" "false" "256" "60000" "true" "true" "10" "survival" "A minecraft server" "true" "default" "world" "true" "0" "false" "/srv/minecraft" "./backups" "64" "$(id -u minecraft)" "$(id -g minecraft)")
+# Setup flag variables for script
+seteula=false
+debug=false
+followlog=false
+verbose=false
+# Usage message
 function usage {
-    echo "Usage: $0 <ACTION> <NAME>"
+    echo "Usage: $0 <ACTION> <OPTIONS> <NAME>"
     echo
+    echo "Options:"
+    echo "  -c <PATH> | --config <PATH>: Use the file at the given path for environment variables instead of a file in the default location"
+    echo "  -d | --debug: Enable debug messages about what values are being set and what is being called. Debug also enables verbosity messages"
+    echo "  -e <TRUE|FALSE> | --eula <TRUE|FALSE>: Set Eula to a desired value, regardless of environment file. Useful for starting a default environment server that doesn't need an environment file just for the EULA option."
+    echo "  -f | --follow: Follows the log of the docker container when used with the 'log' command"
+    echo "  -v | --verbose: Enables verbosity messages about what is happening"
     echo
     echo "Actions:"
-    echo "  help / usage"
+    echo "  help | usage"
     echo "    Displays this message"
     echo "  start   <NAME>"
     echo "    Starts a server with the given name"
@@ -14,6 +30,7 @@ function usage {
     echo "    Restarts the server with the given name"
     echo "  status  <NAME>"
     echo "    Displays if the server with the given name is running"
+    echo "    Name can be given as all to show status of all running servers"
     echo "  save    <NAME>"
     echo "    Saves the server with the given name"
     echo "  backup  <NAME>"
@@ -22,51 +39,105 @@ function usage {
     echo "    Sends the given command to the server with the given name"
     echo "  console <NAME>"
     echo "    Opens an interactive console for the server with the given name"
-    echo "  log <NAME>"
+    echo "  log     <NAME>"
     echo "    Displays the log for the server with the given name"
-    echo "  follow-log <NAME>"
-    echo "    Same as 'log', but it continues to follow the log output of the server"
-    echo
     echo
     echo "Name is a name for the server and the data dir"
     echo "Name cannot be 'default'"
+    echo "Name can only be 'all' when using status command"
+    echo
+    echo "If your user account is not part of the 'docker' group, you will need to invoke this script with sudo in order to use the commands: start, stop, restart, status, save, backup, log, and follow-log"
+    if [[ $debug == true ]]; then
+        echo
+        echo "Command 'print-environment <NAME>' can be used to print environment variables for given server"
+        echo "Command 'print-var <NAME> <VAR>' can be used to print a specific variable for the given server"
+    fi
+
     exit 1
+}
+# Print environment variables
+function printvars {
+    for i in ${!name_arr[@]}; do
+        echo "${name_arr[$i]} - Default: ${vals_arr[$i]} - Currently: ${!name_arr[$i]}"
+    done
+}
+# Print a specific environment variable
+function printvar {
+    echo "$1 is set to ${!1}"
+}
+# Print debug messages if debug flag enabled
+function dmsg {
+    if [[ $debug == true ]]; then echo $@; fi
+}
+# Print verbosity messages if verbose flag enabled
+function vmsg {
+    if [[ $verbose == true ]]; then echo $@; fi
+}
+# Print verbosity messages if verbose flag enabled and debug flag disabled
+function vndmsg {
+    if [[ $verbose == true ]] && [[ ! $debug == true ]]; then echo $@; fi
 }
 # Check if container is running
 function running {
-    stat="$($DOCKER inspect -f '{{.State.Status}}' "$name" 2>/dev/null)"
+    if [[ -z "$1" ]]; then
+        dmsg "Checking docker container ${name}.State.Status ..."
+        stat="$($DOCKER inspect -f '{{.State.Status}}' "$name" 2>/dev/null)"
+    else
+        dmsg "Checking docker container ${1}.State.Status ..."
+        stat="$($DOCKER inspect -f '{{.State.Status}}' "$1" 2>/dev/null)"
+    fi
     test running = "$stat"
     return $?
 }
 function status {
-	if running; then
-		echo "Minecraft server $name is running"
-		exit 0
-	else
-		echo "Minecraft server $name is stopped"
-		exit 2
-	fi
+    if [[ "x$name" == "xall" ]]; then
+        vmsg "Finding docker containers ..."
+        servers=($(docker ps --filter ancestor=itzg/minecraft-server:java8 --format "{{.Names}}"))
+        dmsg "Containers found: [ ${servers[@]} ]"
+        for i in ${!servers[@]}; do
+            vmsg "Testing container '${servers[$i]}'"
+            if running "${servers[$i]}"; then
+                echo "Server '${servers[$i]}' is running. $(minecraftctl command ${servers[$i]} list)"
+            else
+                echo "Server '${servers[$i]}' is stopped"
+            fi
+        done
+    else
+        vmsg "Testing container '$name' for running status ..."
+    	if running; then
+    		echo "Server '$name' is running. $(game_command list)"
+    		exit 0
+    	else
+    		echo "Server '$name' is stopped"
+    		exit 2
+    	fi
+    fi
 }
 # Start the minecraft docker container
 function start {
+    vmsg "Checking if container '$name' is already running ..."
     if running; then
         echo "Server already running..."
         exit 0
     fi
+    vmsg "Calling stop_container to remove potential of conflicting container"
     stop_container
-
+    # # Was a workaround for ICON variable for container not working, but requires you to have write access within the server directory
     # Copy requested server icon if it exists
-    if [[ -f "${ICON}" ]] && [[ ! -f "${DATA_DIR}/${name}/server-icon.png" ]]; then
-        mkdir "${DATA_DIR}/${name}"
-        cp "${ICON}" "${DATA_DIR}/${name}/server-icon.png"
-    fi
-
+#    if [[ -f "${ICON}" ]] && [[ ! -f "${DATA_DIR}/${name}/server-icon.png" ]]; then
+#        vmsg "Copying icon from '${ICON}' to '${DATA_DIR}/${name}/server-icon.png' ..."
+#        mkdir -p "${DATA_DIR}/${name}"
+#        cp "${ICON}" "${DATA_DIR}/${name}/server-icon.png"
+#    fi
+    # Set volume flag for docker, will be changed to empty if ephemeral option is set to true
     vol_mount="--volume=$DATA_DIR/${name}:/data"
+    dmsg "Setting volume flag for docker to '$vol_mount'"
     if $EPHEMERAL; then
+        vmsg "Ephemeral is true, discarding volume flag."
         vol_mount=""
-        echo "Ephemeral server, a restart will lose all world data"
+        echo "Ephemeral server, a restart will lose all world data."
     fi
-
+    vmsg "Calling '$DOCKER' to start server container '$name' ..."
     $DOCKER run -d -i \
         --name "$name" \
         $vol_mount \
@@ -110,261 +181,184 @@ function start {
         -e "ENABLE_AUTOPAUSE=$AUTOPAUSE" \
         -e "TIMEOUT=$TIMEOUT" \
         -e "SPAWN_PROTECTION=$SPAWN_PROTECTION" \
-        itzg/minecraft-server
-
-    echo "Started minecraft container $name"
+        itzg/minecraft-server:java8
+    echo "Started minecraft container '$name'"
 }
 # Send a command to the game server
 function game_command {
+    dmsg "Sending command '$@' to server rcon on port $RCON_PORT ..."
     # Issue command
     $RCON_CMD "$@"
 }
 # Do a world save
 function save {
+    vmsg "Saving world ..."
     game_command "save-all flush"
     game_command "say Saved the world"
 }
 # Do a world backup
 function backup {
     filename="$name-$(date +%Y_%m_%d_%H.%M.%S).tar.gz"
-    game_command "say Starting backup..."
-    # Make sure we always turn saves back on
-    set +e
-    ret=0
-    game_command "save-off"
-    ret=$(($ret + $?))
-    game_command "save-all flush"
-    ret=$(($ret + $?))
-    sync
-    ret=$(($ret + $?))
-    $DOCKER exec -u minecraft "$name" mkdir -p "/data/$BACKUP_DIR"
-    ret=$(($ret + $?))
-    $DOCKER exec -u minecraft "$name" tar -C /data -czf "$BACKUP_DIR/$filename" "$LEVEL" server.properties
-    ret=$(($ret + $?))
-    game_command "save-on"
-    ret=$(($ret + $?))
-    game_command "say Backup finished"
+    vmsg "Creating backup as $filename ..."
+    if running; then
+        game_command "say Starting backup..."
+        # Make sure we always turn saves back on
+        set +e
+        ret=0
+        dmsg "Disabling autosave ..."
+        game_command "save-off"
+        ret=$(($ret + $?))
+        dmsg "Return value currently at '$ret'"
+        dmsg "Saving world ..."
+        game_command "save-all flush"
+        ret=$(($ret + $?))
+        dmsg "Return value currently at '$ret'"
+        dmsg "Synchronizing cached files to storage ..."
+        sync
+        ret=$(($ret + $?))
+        dmsg "Return value currently at '$ret'"
+        dmsg "Creating directory for backup if it doesn't already exist ..."
+        $DOCKER exec -u minecraft "$name" mkdir -p "/data/$BACKUP_DIR"
+        ret=$(($ret + $?))
+        dmsg "Return value currently at '$ret'"
+        dmsg "Creating backup archive ..."
+        $DOCKER exec -u minecraft "$name" tar -C /data -czf "$BACKUP_DIR/$filename" "$LEVEL" server.properties
+        ret=$(($ret + $?))
+        dmsg "Return value currently at '$ret'"
+        dmsg "Re-enabling autosave ..."
+        game_command "save-on"
+        ret=$(($ret + $?))
+        dmsg "Backup finished with return value at '$ret'"
+        game_command "say Backup finished"
+    else
+        read -n 1 -p "The server is not running, sudo will need to be used to run commands as the minecraft user. This will prompt you for your password. Continue? [Y/N]: " continue_yn
+        case $continue_yn in
+            [Yy] ) ret=0; dmsg "Creating directory for backup if it doesn't already exist ..."; sudo -u minecraft mkdir -p "${DATA_DIR}/${name}/${BACKUP_DIR}"; ret=$((ret + $?)); dmsg "Return value currently at '$ret'"; dmsg "Creating backup archive ..."; sudo -u minecraft tar -C "${DATA_DIR}/${name}" -czf "$BACKUP_DIR/$filename" "$LEVEL" server.properties; ret=$((ret + $?)); dmsg "Backup finished with return value at '$ret'"; if [[ ! $debug == true ]]; then echo "Backup finished."; fi;;
+            * ) echo "Cancelling backup."; exit 1;;
+        esac
+    fi
     exit $ret
 }
 # Stop the server
 function stop {
+    vmsg "Testing container '$name' for running status ..."
     if running; then
+        echo "Stopping server '$name' with 10 second warning ..."
         for i in {10..1}; do
+            vmsg "Server shutting down in ${i}s ..."
             game_command "say Server saving and shutting down in ${i}s ..."
             sleep 1
         done
+        vndmsg "Saving and shutting down server ..."
         game_command "say Saving ..."
+        dmsg "Saving world ..."
         game_command "save-all"
         game_command "say Shutting down ..."
+        dmsg "Shutting down server ..."
         game_command "stop"
-        # Wait for container to stop on its own now
+        # Wait for container to stop on its own
+        dmsg "Waiting for docker container to exit ..."
         $DOCKER wait "$name"
+    else
+        vmsg "Server '$name' is not running"
     fi
     stop_container
 }
-# Stop the container
+# Stop and remove the container
 function stop_container {
 	$DOCKER stop "$name" > /dev/null 2>&1 || true
-	$DOCKER rm "$name" > /dev/null 2>&1 || true
+    $DOCKER rm "$name" > /dev/null 2>&1 || true
 }
 # Can't use 'default' as server name
 function unuseable_name {
-    echo "Cannot use name '$name' for server."
+    case $1 in
+        a) echo "Cannot use given command on all containers.";;
+        d|*) echo "Cannot use name '$name' for server.";;
+    esac
     exit 3
 }
-# Interactive console
+# Open an interactive console with the server
 function game_console {
     echo "Connecting to server console ..."
     $RCON_CMD
 }
 # Show log
 function show_log {
-    $DOCKER logs -t "$name"
+    if [[ $followlog == true ]]; then
+        $DOCKER logs -ft "$name"
+    else
+        $DOCKER logs -t "$name"
+    fi
     exit 0
 }
-# Follow log
-function active_log {
-    $DOCKER logs -ft "$name"
-    exit 0
+# Check variables and set default values if needed
+function check_vars {
+    vmsg "Checking variables for empty values ..."
+    # Loop through each variable
+    for i in ${!name_arr[@]}; do
+        # Check if it is empty
+        if [[ -z ${!name_arr[$i]} ]]; then
+            # Set variable with matching default value
+            declare -g "${name_arr[$i]}=${vals_arr[$i]}"
+            dmsg "'${name_arr[$i]}' is empty, setting to default value of '${vals_arr[$i]}'"
+        fi
+    done
+    # Set the rcon command now that password and port are set either to user-defined or default values
+    RCON_CMD="mcrcon -P ${RCON_PORT} -p ${RCON_PASSWORD}"
+    dmsg "Setting RCON_CMD to '$RCON_CMD'"
 }
 
-# Launch Minecraft docker container
+# Exit immediately if a command exits with non-zero status
 set -e
-# Check given name
-name=$2
-if [[ -z "$name" ]]; then
-    usage
-elif [[ "x$name" == "xdefault" ]]; then
-    unuseable_name
-fi
 
-# Attempt to source the related configuration file
-if [[ -f "/etc/minecraft/$name" ]]; then
+# Check valid command before other steps
+case $1 in
+    status|start|stop|restart|backup|save|command|console|log|help|usage|print-environment|print-var) if [[ "$@" == *"-d"* ]] || [[ "$@" == *"--debug"* ]]; then echo "Command recognized as $1"; fi; cmd=$1; shift;;
+    *) usage;;
+esac
+# Command line options
+while true; do
+    case $1 in
+        -e|--eula) shift; eulaset=$1; seteula=true; shift;;
+        -c|--config) shift; cfg_file=$1; shift;;
+        -f|--follow) shift; followlog=true;;
+        -d|--debug) shift; debug=true; verbose=true; echo "Debug messages enabled."; echo "Verbosity messages enabled.";;
+        -v|--verbose) shift; verbose=true; echo "Verbosity messages enabled.";;
+        -*) echo "Unknown option: $1"; exit 1;;
+        *) break;;
+    esac
+done
+# Option based debug messages
+if [[ $seteula == true ]]; then vndmsg "Eula flag found."; dmsg "Eula flag found, eula will be set to $eulaset"; fi
+if [[ -n $cfg_file ]]; then vndmsg "Config file flag found."; dmsg "Config file will attempt to load from '$cfg_file'"; fi
+
+# Check given name
+if [[ -z "$1" ]]; then
+    usage
+elif [[ "x$1" == "xdefault" ]]; then
+    unuseable_name d
+elif [[ "x$1" == "xall" ]]; then
+    case $cmd in
+        status) name=$1;;
+        *) unuseable_name a;;
+    esac
+else
+    name=$1
+fi
+# Source config file from either command line option or from /etc/minecraft
+if [[ -n $cfg_file ]] && [[ -r $cfg_file ]]; then
+    source "$cfg_file"
+elif [[ -r "/etc/minecraft/$name" ]]; then
     source "/etc/minecraft/$name"
 fi
-
-# Check Environment variables
-
-# Get system default docker path if none is provided in configuration file
-if [[ -z $DOCKER ]]; then
-    DOCKER=$(which docker)
-fi
-# Default listen port
-# This is the published host port,
-# internally, the container always listens on 25565
-if [[ -z $PORT ]]; then
-    PORT="25565"
-fi
-# Default listen port for Rcon
-# This is the published host port,
-# internally, the container always listens on 25575
-if [[ -z $RCON_PORT ]]; then
-    RCON_PORT="25575"
-fi
-# Default Rcon password
-if [[ -z $RCON_PASSWORD ]]; then
-    RCON_PASSWORD="minecraft"
-fi
-# Set Rcon command template
-RCON_CMD="mcrcon -P ${RCON_PORT} -p ${RCON_PASSWORD}"
-# Default min java heap size in MB
-if [[ -z $MINHEAP ]]; then
-    MINHEAP="512"
-fi
-# Default max java heap size in MB
-if [[ -z $MAXHEAP ]]; then
-    MAXHEAP="2048"
-fi
-# EULA - Defaults to false, must be set to true to start server
-if [[ -z $EULA ]]; then
-    EULA=false
-fi
-# Server type
-if [[ -z $TYPE ]]; then
-    TYPE="vanilla"
-fi
-# Game version
-if [[ -z $VERSION ]]; then
-    VERSION="LATEST"
-fi
-# Game difficulty
-if [[ -z $DIFFICULTY ]]; then
-    DIFFICULTY="normal"
-fi
-# Server icon
-if [[ -z $ICON ]]; then
-    ICON="/srv/minecraft/default/server-icon.png"
-fi
-# Max players
-if [[ -z $MAX_PLAYERS ]]; then
-    MAX_PLAYERS="10"
-fi
-# Max world size
-if [[ -z $MAX_WORLD_SIZE ]]; then
-    MAX_WORLD_SIZE="29999984"
-fi
-# Allow nether
-if [[ -z $ALLOW_NETHER ]]; then
-    ALLOW_NETHER=true
-fi
-# Announce player achievements
-if [[ -z $ANNOUNCE_PLAYER_ACHIEVEMENTS ]]; then
-    ANNOUNCE_PLAYER_ACHIEVEMENTS=true
-fi
-# Enable command blocks
-if [[ -z $ENABLE_COMMAND_BLOCK ]]; then
-    ENABLE_COMMAND_BLOCK=false
-fi
-# Force gamemode
-if [[ -z $FORCE_GAMEMODE ]]; then
-    FORCE_GAMEMODE=false
-fi
-# Generate structures
-if [[ -z $GENERATE_STRUCTURES ]]; then
-    GENERATE_STRUCTURES=true
-fi
-# Hardcore
-if [[ -z $HARDCORE ]]; then
-    HARDCORE=false
-fi
-# Max build height
-if [[ -z $MAX_BUILD_HEIGHT ]]; then
-    MAX_BUILD_HEIGHT=256
-fi
-# Max tick time
-if [[ -z $MAX_TICK_TIME ]]; then
-    MAX_TICK_TIME=60000
-fi
-# Spawn monsters
-if [[ -z $SPAWN_MONSTERS ]]; then
-    SPAWN_MONSTERS=true
-fi
-# Spawn NPCs
-if [[ -z $SPAWN_NPCS ]]; then
-    SPAWN_NPCS=true
-fi
-# View distance
-if [[ -z $VIEW_DISTANCE ]]; then
-    VIEW_DISTANCE=10
-fi
-# Gamemode ?
-if [[ -z $MODE ]]; then
-    MODE="survival"
-fi
-# Message of the day
-if [[ -z $MOTD ]]; then
-    MOTD="A Minecraft server"
-fi
-# PVP
-if [[ -z $PVP ]]; then
-    PVP=true
-fi
-# Level type
-if [[ -z $LEVEL_TYPE ]]; then
-    LEVEL_TYPE="default"
-fi
-# Name of world dir
-if [[ -z $LEVEL ]]; then
-    LEVEL="world"
-fi
-# World folder name ?
-if [[ -z $WORLD ]]; then
-    WORLD="world"
-fi
-# IDs of minecraft user and group
-MINECRAFT_UID=$(id -u minecraft)
-MINECRAFT_GID=$(id -g minecraft)
-# Docker autopause
-if [[ -z $AUTOPAUSE ]]; then
-    AUTOPAUSE=true
-fi
-# Game command timeout
-if [[ -z $TIMEOUT ]]; then
-    TIMEOUT="0"
-fi
-# Wether to mount a persistent volume for the server
-# If true a volume will not be mounted and a restart will lose all world data
-if [[ -z $EPHEMERAL ]]; then
-    EPHEMERAL=false
-fi
-# Directory for persisting minecraft data
-if [[ -z $DATA_DIR ]]; then
-    DATA_DIR="/srv/minecraft"
-fi
-# Relative directory to $DATA_DIR for saving minecraft backups
-if [[ -z $BACKUP_DIR ]]; then
-    BACKUP_DIR="./backups"
-fi
-# Default spawn protection region
-if [[ -z $SPAWN_PROTECTION ]]; then
-    SPAWN_PROTECTION=64
-fi
-# Set debug flag to print trace for select commands
-if [[ -n "$DEBUG" ]]; then
-    set -x
+# Set default values for variables where needed
+check_vars
+# Set eula if eula flag present
+if [[ $seteula == true ]]; then
+    EULA=$eulaset
 fi
 # Handle command issued to script
-case "$1" in
+case "$cmd" in
 	status)     status;;
 	start)      start;;
 	stop)       stop;;
@@ -373,9 +367,10 @@ case "$1" in
 	save)       save;;
     help)       usage;;
     usage)      usage;;
-    command)    shift 2; game_command "$@";;
+    command)    shift; game_command "$@";;
     console)    game_console;;
     log)        show_log;;
-    follow-log) active_log;;
+    print-environment) printvars;;
+    print-var) shift; printvar "$1";;
 	*)          usage;;
 esac

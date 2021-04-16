@@ -36,8 +36,8 @@
 # Ops - OPS=user1,user2 ...
 #OPS=
 
-# Server icon
-#ICON="/path/to/server-icon.png"
+# URL to server icon. Will be resized and converted as needed
+#ICON=""
 
 # Max players
 #MAX_PLAYERS="10"

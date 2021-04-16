@@ -1,0 +1,6 @@
+[Unit]
+Description=Restart %I Minecraft server
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/minecraftctl restart %i

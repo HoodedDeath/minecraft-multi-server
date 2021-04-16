@@ -74,6 +74,8 @@ in the `/etc/minecraft/<NAME>` file
 
 An example configuration file is supplied as `/etc/minecraft/default` with most available properties.
 
+Use the `-c <PATH>` or `--config <PATH>` option to use a config file in a different location or with a different name
+
 All properties in `server.properties` are available to be set.
 
 ## Ephemeral server
@@ -153,3 +155,14 @@ Many thanks to both projects for making this one possible.
     - When starting, the script would only check if the desired icon file exists, which would cause the script to attempt to overwrite the icon within the server directory, leading to permission denied and the script exiting due to failure
   - Added SPAWN_PROTECTION option to docker call for starting server
   - Reordered environment variables checks to look a bit nicer
+- 1.5
+  - Added command line options
+    - `--config <PATH>` option to specify path to a config file
+    - `--eula <TRUE|FALSE>` option to specify eula variable regardless of config file, allowing to start a server without needing a config file
+    - `--follow` option to keep the log option from the docker container to print out log entries as they happen
+    - `--verbose` to enable verbose messages as script runs for general debugging
+    - `--debug` to enable more verbose messages as script runs for more detailed debugging
+  - Added `print-environment` and `print-var` commands to script to print out all variables or a specific variable respectively
+  - Removed copying server icon from file, as it was not working without changing write permissions within server directory
+  - Removed `follow-log` command, functionality moved to `log --follow`
+  - General reworking of script
